@@ -1,6 +1,6 @@
-# Latent ChemLib
+# Better ChemLib Hazards
 
-Latent ChemLib is a Forge `1.20.1` bridge for the parts of ChemLib matter that
+Better ChemLib Hazards is a Forge `1.20.1` bridge for the parts of ChemLib matter that
 need world consequences: gas escape, radioactive decay, neutron-driven fission,
 and radioactive-form emission profiles.
 
@@ -33,8 +33,8 @@ ChemLib registry data.
   machines. Owning mods remain authoritative for installing and persisting
   containment and for processing.
 - File-based datapack reload support for:
-  - `data/latent_chemlib/chemical_traits/*.json`
-  - `data/latent_chemlib/scheduler_profiles/default.json`
+  - `data/better_chemlib_hazards/chemical_traits/*.json`
+  - `data/better_chemlib_hazards/scheduler_profiles/default.json`
 - Server tick budgets for gas-escape and nuclear workloads. Gas scans rotate
   block and entity holders within the existing allowance.
 - Unit tests for numeric curves and emergent simulation math.
@@ -82,11 +82,11 @@ and failed results without starting additional servers.
 Pack-side datapack examples are expected under:
 
 ```text
-data/latent_chemlib/chemical_traits/
-data/latent_chemlib/nuclear_forms/
-data/latent_chemlib/nuclear_decay/
-data/latent_chemlib/nuclear_phenomena/
-data/latent_chemlib/scheduler_profiles/
+data/better_chemlib_hazards/chemical_traits/
+data/better_chemlib_hazards/nuclear_forms/
+data/better_chemlib_hazards/nuclear_decay/
+data/better_chemlib_hazards/nuclear_phenomena/
+data/better_chemlib_hazards/scheduler_profiles/
 ```
 
 Traits expose volatility, thermal, instability, absorption, and scattering
@@ -110,4 +110,4 @@ For modpack and mod discussion, playtest feedback, and bug reports, join the [Be
 
 ## Identity
 
-The canonical identity is repository/artifact `latent-chemlib`, mod ID and resource namespace `latent_chemlib`, and Maven group `com.bettercontent`. Latent has a mandatory loader and typed binary dependency on Heat Sync, which owns the pack's thermal transport API; other consumers may use Latent's read-only emission API.
+The canonical identity is repository/artifact `better-chemlib-hazards`, mod ID and resource namespace `better_chemlib_hazards`, and Maven group `com.bettercontent`. Latent has a mandatory loader and typed binary dependency on Heat Sync, which owns the pack's thermal transport API; other consumers may use Latent's read-only emission API.

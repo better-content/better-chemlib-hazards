@@ -1,6 +1,6 @@
 {
   "replace": false,
   "entries": [
-    "latent_chemlib:placed_nuclear_state"
+    "better_chemlib_hazards:placed_nuclear_state"
   ]
 }

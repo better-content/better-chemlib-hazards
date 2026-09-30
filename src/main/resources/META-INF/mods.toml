@@ -7,7 +7,7 @@ issueTrackerURL="${modIssueTrackerUrl}"
 modId="${modId}"
 version="${modVersion}"
 displayName="${modName}"
-displayURL="https://github.com/better-content/latent-chemlib"
+displayURL="https://github.com/better-content/better-chemlib-hazards"
 authors="${modAuthors}"
 description='''
 ${modDescription}
@@ -28,7 +28,7 @@ ordering="NONE"
 side="BOTH"
 
 [[dependencies.${modId}]]
-modId="heat_sync"
+modId="better_industrial_heat"
 mandatory=true
 versionRange="[0.1.0,)"
 ordering="AFTER"

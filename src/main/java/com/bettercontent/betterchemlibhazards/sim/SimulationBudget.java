@@ -1,0 +1,11 @@
+package com.bettercontent.betterchemlibhazards.sim;
+
+public enum SimulationBudget {
+    ESCAPE_SCANS,
+    NUCLEAR_SURFACE_SCANS,
+    NUCLEAR_STACK_EVALUATIONS,
+    NUCLEAR_STATE_EVALUATIONS,
+    NUCLEAR_MUTATIONS,
+    NUCLEAR_RADIATION_EMISSIONS,
+    NUCLEAR_HEAT_EMISSIONS
+}

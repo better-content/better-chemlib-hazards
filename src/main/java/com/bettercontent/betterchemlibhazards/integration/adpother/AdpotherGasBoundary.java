@@ -1,0 +1,169 @@
+package com.bettercontent.betterchemlibhazards.integration.adpother;
+
+import com.bettercontent.betterchemlibhazards.sim.ChemicalState;
+import com.endertech.minecraft.mods.adpother.AdPother;
+import com.endertech.minecraft.mods.adpother.blocks.Pollutant;
+import com.smashingmods.chemlib.api.Chemical;
+import com.smashingmods.chemlib.api.MatterState;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.registries.ForgeRegistries;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * The narrow boundary between contained Latent chemistry and AdPother's native
+ * atmospheric blocks. Once matter crosses this boundary, AdPother is its sole
+ * simulation authority.
+ */
+public final class AdpotherGasBoundary {
+    public static final AdpotherGasBoundary INSTANCE = new AdpotherGasBoundary();
+    public static final double MASS_PER_ADPOTHER_UNIT = 16.0;
+    private static final double UNIT_EPSILON = 1.0e-9;
+
+    private AdpotherGasBoundary() {}
+
+    /**
+     * Atomically releases a state which AdPother can represent exactly.
+     *
+     * <p>The source owner keeps the state until this method succeeds.  The
+     * boundary deliberately refuses a fractional unit rather than accepting a
+     * rounded prefix: neither an item nor a fluid block has a place to retain
+     * that remainder after its source is consumed.</p>
+     */
+    public ReleaseResult release(ServerLevel level, BlockPos origin, ChemicalState state) {
+        if (state == null || state.mass() <= 0.0) return ReleaseResult.rejected(state);
+
+        List<PollutantPayload> payloads = new ArrayList<>();
+        for (var component : state.components().entrySet()) {
+            int units = exactUnits(component.getValue());
+            // A source may only be debited after every component has an exact
+            // native representation.  In particular 375 mB is 24 mass: it is
+            // retained, rather than quietly releasing 250 mB and losing 125.
+            if (units < 0) return ReleaseResult.rejected(state);
+            if (units <= 0) continue;
+            Pollutant<?> pollutant = pollutantFor(component.getKey()).orElse(null);
+            if (pollutant == null) return ReleaseResult.rejected(state);
+            payloads.add(new PollutantPayload(component.getKey(), pollutant, units));
+        }
+        if (payloads.isEmpty()) return ReleaseResult.rejected(state);
+
+        Map<BlockPos, BlockState> virtualStates = new HashMap<>();
+        List<Placement> placements = new ArrayList<>();
+        for (PollutantPayload payload : payloads) {
+            int remaining = payload.units();
+            for (BlockPos offset : candidateOffsets(payload.chemicalId())) {
+                if (remaining == 0) break;
+                BlockPos pos = origin.offset(offset).immutable();
+                if (!level.isInWorldBounds(pos) || !level.isLoaded(pos)) continue;
+                BlockState simulated = virtualStates.computeIfAbsent(pos, level::getBlockState);
+                int accepted = 0;
+                while (remaining > 0 && payload.pollutant().canStateBePumped(simulated)) {
+                    BlockState next = payload.pollutant().getPumpedState(simulated);
+                    if (next.equals(simulated)) break;
+                    simulated = next;
+                    accepted++;
+                    remaining--;
+                }
+                if (accepted > 0) {
+                    virtualStates.put(pos, simulated);
+                    placements.add(new Placement(pos, payload.pollutant(), accepted));
+                }
+            }
+            if (remaining > 0) return ReleaseResult.rejected(state);
+        }
+
+        BlockPos firstTarget = null;
+        int acceptedUnits = 0;
+        for (Placement placement : placements) {
+            if (firstTarget == null) firstTarget = placement.pos();
+            acceptedUnits += placement.units();
+        }
+        // Commit the exact states calculated above.  Do not call pump and then
+        // report rejection or restore source blocks: a post-insert rejection is
+        // ambiguous to callers and can duplicate matter on their rollback path.
+        virtualStates.forEach((pos, next) -> level.setBlock(pos, next, 3));
+        return new ReleaseResult(
+            acceptedUnits * MASS_PER_ADPOTHER_UNIT,
+            0.0,
+            firstTarget
+        );
+    }
+
+    public String chemicalId(Pollutant<?> pollutant) {
+        ResourceLocation pollutantId = ForgeRegistries.BLOCKS.getKey(pollutant);
+        String path = pollutantId == null ? pollutant.getSimpleName() : pollutantId.getPath();
+        if ("carbon".equals(path)) return "chemlib:carbon_dioxide";
+        if ("sulfur".equals(path)) return "chemlib:sulfur_dioxide";
+        if ("dust".equals(path)) return "better_chemlib_hazards:dust";
+
+        ResourceLocation chemicalId = ResourceLocation.fromNamespaceAndPath("chemlib", path);
+        if (ForgeRegistries.ITEMS.getValue(chemicalId) instanceof Chemical chemical
+            && chemical.getMatterState() == MatterState.GAS) {
+            return chemicalId.toString();
+        }
+        return "adpother:" + path;
+    }
+
+    public Optional<Pollutant<?>> pollutantFor(String chemicalId) {
+        if (chemicalId == null || chemicalId.isBlank()) return Optional.empty();
+        int separator = chemicalId.indexOf(':');
+        String path = separator >= 0 ? chemicalId.substring(separator + 1) : chemicalId;
+        if (path.endsWith("_lamp_block")) path = path.substring(0, path.length() - "_lamp_block".length());
+        Optional<Pollutant<?>> exact = AdPother.getInstance().pollutants.findByName(path);
+        if (exact.isPresent()) return exact;
+        if ("carbon_dioxide".equals(path)) return AdPother.getInstance().pollutants.findByName("carbon");
+        if ("sulfur_dioxide".equals(path)) return AdPother.getInstance().pollutants.findByName("sulfur");
+        return Optional.empty();
+    }
+
+    static List<BlockPos> candidateOffsets(String chemicalId) {
+        List<BlockPos> offsets = new ArrayList<>();
+        for (int x = -3; x <= 3; x++) {
+            for (int y = -3; y <= 3; y++) {
+                for (int z = -3; z <= 3; z++) offsets.add(new BlockPos(x, y, z));
+            }
+        }
+        int chemicalHash = chemicalId.hashCode();
+        offsets.sort(Comparator.comparingInt((BlockPos pos) -> pos.distManhattan(BlockPos.ZERO))
+            .thenComparingInt(pos -> Integer.rotateLeft(pos.hashCode() ^ chemicalHash, 13))
+            .thenComparingInt(BlockPos::getX)
+            .thenComparingInt(BlockPos::getY)
+            .thenComparingInt(BlockPos::getZ));
+        return List.copyOf(offsets);
+    }
+
+    /** True only when every component has a whole native AdPother unit. */
+    static boolean isExactlyRepresentable(ChemicalState state) {
+        return state != null && state.mass() > 0.0
+            && state.components().values().stream().allMatch(mass -> exactUnits(mass) >= 0);
+    }
+
+    private static int exactUnits(double mass) {
+        if (!Double.isFinite(mass) || mass <= 0.0) return -1;
+        double units = mass / MASS_PER_ADPOTHER_UNIT;
+        long rounded = Math.round(units);
+        if (rounded <= 0L || rounded > Integer.MAX_VALUE || Math.abs(units - rounded) > UNIT_EPSILON) return -1;
+        return (int) rounded;
+    }
+
+    private record PollutantPayload(String chemicalId, Pollutant<?> pollutant, int units) {}
+    private record Placement(BlockPos pos, Pollutant<?> pollutant, int units) {}
+
+    public record ReleaseResult(double acceptedMass, double rejectedMass, BlockPos target) {
+        static ReleaseResult rejected(ChemicalState state) {
+            return new ReleaseResult(0.0, state == null ? 0.0 : Math.max(0.0, state.mass()), null);
+        }
+
+        public boolean acceptedAll() {
+            return acceptedMass > 0.0 && rejectedMass == 0.0;
+        }
+    }
+}

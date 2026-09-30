@@ -33,7 +33,7 @@ group = property("mod_group") as String
 version = modVersion
 
 base {
-    archivesName.set("latent-chemlib")
+    archivesName.set("better-chemlib-hazards")
 }
 
 fun deobf(notation: Any): Any =
@@ -119,7 +119,7 @@ repositories {
     maven("https://maven.blamejared.com")
     flatDir {
         dirs(
-            betterContentJar("heat-sync", "heat-sync-0.1.0.jar").parentFile
+            betterContentJar("better-industrial-heat", "better-industrial-heat-0.1.0.jar").parentFile
         )
     }
 }
@@ -129,8 +129,8 @@ dependencies {
 
     // Heat Sync owns the pack's thermal transport API.  This is intentionally typed,
     // not an event/reflection bridge, so generated HU cannot silently disappear.
-    compileOnly(deobf("local:heat-sync:0.1.0"))
-    runtimeOnly(deobf("local:heat-sync:0.1.0"))
+    compileOnly(deobf("local:better-industrial-heat:0.1.0"))
+    runtimeOnly(deobf("local:better-industrial-heat:0.1.0"))
 
     // Latent does not integrate with Create or Kotlin for Forge, but the local
     // Heat Sync runtime used by the repository gate has those mandatory dependencies.
@@ -174,15 +174,15 @@ tasks.processResources {
 }
 
 mixin {
-    add(sourceSets.main.get(), "latent_chemlib.refmap.json")
-    config("latent_chemlib.mixins.json")
+    add(sourceSets.main.get(), "better_chemlib_hazards.refmap.json")
+    config("better_chemlib_hazards.mixins.json")
 }
 
 tasks.named<Jar>("jar") {
     dependsOn(tasks.named("compileJava"))
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(layout.buildDirectory.file("tmp/compileJava/compileJava-refmap.json")) {
-        rename { "latent_chemlib.refmap.json" }
+        rename { "better_chemlib_hazards.refmap.json" }
     }
     finalizedBy("reobfJar")
 }
@@ -228,15 +228,15 @@ val verifyRuntimeJar by tasks.registering {
     doLast {
         val jarFile = runtimeJar.get().asFile
         ZipFile(jarFile).use { zip ->
-            val mixinConfig = zip.getEntry("latent_chemlib.mixins.json")
-                ?: throw GradleException("Runtime JAR is missing latent_chemlib.mixins.json: $jarFile")
+            val mixinConfig = zip.getEntry("better_chemlib_hazards.mixins.json")
+                ?: throw GradleException("Runtime JAR is missing better_chemlib_hazards.mixins.json: $jarFile")
             val mixinConfigText = zip.getInputStream(mixinConfig).bufferedReader().use { it.readText() }
-            check(mixinConfigText.contains("\"refmap\": \"latent_chemlib.refmap.json\"")) {
-                "Runtime mixin config does not declare latent_chemlib.refmap.json: $jarFile"
+            check(mixinConfigText.contains("\"refmap\": \"better_chemlib_hazards.refmap.json\"")) {
+                "Runtime mixin config does not declare better_chemlib_hazards.refmap.json: $jarFile"
             }
 
-            val refmap = zip.getEntry("latent_chemlib.refmap.json")
-                ?: throw GradleException("Runtime JAR is missing latent_chemlib.refmap.json: $jarFile")
+            val refmap = zip.getEntry("better_chemlib_hazards.refmap.json")
+                ?: throw GradleException("Runtime JAR is missing better_chemlib_hazards.refmap.json: $jarFile")
             val refmapText = zip.getInputStream(refmap).bufferedReader().use { it.readText() }
             check(refmapText.contains("RadioactiveItemEntityMixin") && refmapText.contains("m_6469_")) {
                 "Runtime refmap lacks the production mapping for RadioactiveItemEntityMixin.hurt: $jarFile"
@@ -265,15 +265,15 @@ tasks.jacocoTestReport {
     classDirectories.setFrom(
         files(
             sourceSets.main.get().output.asFileTree.matching {
-                include("com/bettercontent/latentchemlib/data/ChemicalTraits.class")
-                include("com/bettercontent/latentchemlib/data/NuclearDecayRule.class")
-                include("com/bettercontent/latentchemlib/data/NumericCurve.class")
-                include("com/bettercontent/latentchemlib/data/PresetCurve.class")
-                include("com/bettercontent/latentchemlib/data/SchedulerProfile.class")
-                include("com/bettercontent/latentchemlib/sim/ChemicalState.class")
-                include("com/bettercontent/latentchemlib/sim/EmergentMath.class")
-                include("com/bettercontent/latentchemlib/sim/SimulationBudget.class")
-                include("com/bettercontent/latentchemlib/sim/SimulationBudgetLedger.class")
+                include("com/bettercontent/betterchemlibhazards/data/ChemicalTraits.class")
+                include("com/bettercontent/betterchemlibhazards/data/NuclearDecayRule.class")
+                include("com/bettercontent/betterchemlibhazards/data/NumericCurve.class")
+                include("com/bettercontent/betterchemlibhazards/data/PresetCurve.class")
+                include("com/bettercontent/betterchemlibhazards/data/SchedulerProfile.class")
+                include("com/bettercontent/betterchemlibhazards/sim/ChemicalState.class")
+                include("com/bettercontent/betterchemlibhazards/sim/EmergentMath.class")
+                include("com/bettercontent/betterchemlibhazards/sim/SimulationBudget.class")
+                include("com/bettercontent/betterchemlibhazards/sim/SimulationBudgetLedger.class")
             }
         )
     )

@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.bettercontent.betterchemlibhazards.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "better_chemlib_hazards.refmap.json",
+  "mixins": [
+    "BlockEntityMutationMixin",
+    "LiquidBlockGasificationMixin",
+    "RadioactiveItemEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

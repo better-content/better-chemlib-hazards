@@ -8,6 +8,7 @@ import com.bettercontent.betterchemlibhazards.integration.adpother.AdpotherGasBo
 import com.smashingmods.chemlib.api.Chemical;
 import com.smashingmods.chemlib.api.MatterState;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
@@ -142,12 +143,18 @@ public class GasEscapeHandler {
 
     private int visitBlockInventory(ServerLevel level, boolean[] canContinue) {
         return blockInventories(level).visit(1, pos -> {
-            BlockEntity blockEntity = level.isLoaded(pos) ? level.getBlockEntity(pos) : null;
-            if (blockEntity == null) return ActiveHolderSet.Decision.REMOVE;
+            // Charge deferred probes too: the KEEP round-robin loop must remain
+            // bounded when an inventory's FULL neighborhood is not yet ready.
             if (!SimulationScheduler.INSTANCE.trySpend(level, SimulationBudget.ESCAPE_SCANS, 1)) {
                 canContinue[0] = false;
                 return ActiveHolderSet.Decision.STOP;
             }
+            LevelChunk chunk = level.getChunkSource().getChunkNow(
+                SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
+            if (chunk == null) return ActiveHolderSet.Decision.KEEP;
+            BlockEntity blockEntity = chunk.getBlockEntity(pos);
+            if (blockEntity == null || InventoryScanPolicy.hasPendingLoot(blockEntity)) return ActiveHolderSet.Decision.REMOVE;
+            if (!InventoryScanPolicy.neighborhoodLoaded(level, pos)) return ActiveHolderSet.Decision.KEEP;
             scanHolder(blockEntity, pos, level);
             return hasEscapableHolder(blockEntity) ? ActiveHolderSet.Decision.KEEP : ActiveHolderSet.Decision.REMOVE;
         });
@@ -219,7 +226,8 @@ public class GasEscapeHandler {
     }
 
     private void scanHolder(Object holder, BlockPos origin, ServerLevel level) {
-        if (isAirtight(holder)) return;
+        if (isAirtight(holder) || InventoryScanPolicy.hasPendingLoot(holder)
+            || !InventoryScanPolicy.neighborhoodLoaded(level, origin)) return;
         if (holder instanceof Container container) {
             scanContainer(container, origin, level);
             return;
@@ -235,6 +243,19 @@ public class GasEscapeHandler {
         }
     }
 
+    /** Native proof seams share the production scan and retention checks. */
+    public boolean scanBlockInventoryNow(ServerLevel level, BlockEntity blockEntity) {
+        if (blockEntity == null || blockEntity.getLevel() != level) return false;
+        scanHolder(blockEntity, blockEntity.getBlockPos(), level);
+        return hasEscapableHolder(blockEntity);
+    }
+
+    public boolean scanEntityInventoryNow(ServerLevel level, Entity entity) {
+        if (entity == null || entity.level() != level) return false;
+        scanHolder(entity, entity.blockPosition(), level);
+        return hasEscapableHolder(entity);
+    }
+
     public static void markActive(BlockEntity blockEntity) {
         if (blockEntity.getLevel() instanceof ServerLevel level) {
             INSTANCE.blockInventories(level).add(blockEntity.getBlockPos().immutable());
@@ -242,7 +263,7 @@ public class GasEscapeHandler {
     }
 
     private boolean hasEscapableHolder(Object holder) {
-        if (isAirtight(holder)) return false;
+        if (isAirtight(holder) || InventoryScanPolicy.hasPendingLoot(holder)) return false;
         if (holder instanceof Container container) {
             for (int slot = 0; slot < container.getContainerSize(); slot++) {
                 if (escapePayload(container.getItem(slot)).isPresent()) return true;

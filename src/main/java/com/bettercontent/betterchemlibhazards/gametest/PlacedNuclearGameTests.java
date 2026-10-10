@@ -116,6 +116,7 @@ public final class PlacedNuclearGameTests {
         helper.assertTrue(before.contains("LootTable"), "fixture must have unopened native loot");
         for (int pass = 0; pass < 3; pass++) {
             com.bettercontent.betterchemlibhazards.sim.NuclearSurfaceScanner.INSTANCE.scanBlockInventoryNow(level, chest);
+            com.bettercontent.betterchemlibhazards.sim.GasEscapeHandler.INSTANCE.scanBlockInventoryNow(level, chest);
             helper.assertTrue(chest.saveWithoutMetadata().equals(before),
                 "background hazard scanning must neither roll loot nor change its native NBT");
         }
@@ -125,8 +126,27 @@ public final class PlacedNuclearGameTests {
             "native opening must still materialize its loot normally");
         var opened = chest.saveWithoutMetadata();
         com.bettercontent.betterchemlibhazards.sim.NuclearSurfaceScanner.INSTANCE.scanBlockInventoryNow(level, chest);
+        com.bettercontent.betterchemlibhazards.sim.GasEscapeHandler.INSTANCE.scanBlockInventoryNow(level, chest);
         helper.assertTrue(chest.saveWithoutMetadata().equals(opened),
             "ordinary non-radioactive materialized contents must remain unchanged");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void gas_scan_preserves_pending_native_container_entity_loot(GameTestHelper helper) {
+        var level = helper.getLevel();
+        var pos = helper.absolutePos(new BlockPos(1, 1, 1));
+        var cart = new net.minecraft.world.entity.vehicle.MinecartChest(level, pos.getX(), pos.getY(), pos.getZ());
+        var loot = new ResourceLocation("minecraft", "chests/simple_dungeon");
+        cart.setLootTable(loot);
+        cart.setLootTableSeed(12345L);
+        for (int pass = 0; pass < 3; pass++) {
+            com.bettercontent.betterchemlibhazards.sim.GasEscapeHandler.INSTANCE.scanEntityInventoryNow(level, cart);
+            helper.assertTrue(loot.equals(cart.getLootTable()) && cart.getLootTableSeed() == 12345L,
+                "passive scans must leave container-entity loot and its seed native-owned");
+        }
+        cart.getItem(0);
+        helper.assertTrue(cart.getLootTable() == null, "native container-entity access must still roll loot normally");
         helper.succeed();
     }
 

@@ -9,13 +9,13 @@ final class NuclearInventoryNeighborhoodTest {
     @Test
     void comparatorAndEnvironmentReadsRequireImmediatelyAvailableNeighborChunks() {
         Predicate<BlockPos> originOnly = pos -> Math.floorDiv(pos.getX(), 16) == 0 && Math.floorDiv(pos.getZ(), 16) == 0;
-        assertTrue(NuclearSurfaceScanner.inventoryNeighborhoodLoaded(new BlockPos(8, 64, 8), originOnly));
-        assertFalse(NuclearSurfaceScanner.inventoryNeighborhoodLoaded(new BlockPos(14, 64, 8), originOnly),
+        assertTrue(InventoryScanPolicy.neighborhoodLoaded(new BlockPos(8, 64, 8), originOnly));
+        assertFalse(InventoryScanPolicy.neighborhoodLoaded(new BlockPos(14, 64, 8), originOnly),
             "a comparator read may reach two blocks past the holder");
-        assertFalse(NuclearSurfaceScanner.inventoryNeighborhoodLoaded(new BlockPos(0, 64, 8), originOnly));
-        assertFalse(NuclearSurfaceScanner.inventoryNeighborhoodLoaded(new BlockPos(8, 64, 8), pos -> false));
-        assertTrue(NuclearSurfaceScanner.inventoryNeighborhoodLoaded(new BlockPos(-8, 64, -8),
+        assertFalse(InventoryScanPolicy.neighborhoodLoaded(new BlockPos(0, 64, 8), originOnly));
+        assertFalse(InventoryScanPolicy.neighborhoodLoaded(new BlockPos(8, 64, 8), pos -> false));
+        assertTrue(InventoryScanPolicy.neighborhoodLoaded(new BlockPos(-8, 64, -8),
             pos -> Math.floorDiv(pos.getX(), 16) == -1 && Math.floorDiv(pos.getZ(), 16) == -1));
-        assertTrue(NuclearSurfaceScanner.inventoryNeighborhoodLoaded(new BlockPos(15, 64, 15), pos -> true));
+        assertTrue(InventoryScanPolicy.neighborhoodLoaded(new BlockPos(15, 64, 15), pos -> true));
     }
 }

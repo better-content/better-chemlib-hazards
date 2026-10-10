@@ -1,6 +1,8 @@
 package com.bettercontent.betterchemlibhazards.sim;
 
+import com.bettercontent.betterchemlibhazards.mixin.RandomizableContainerBlockEntityAccessor;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Containers;
@@ -11,6 +13,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
@@ -232,11 +235,17 @@ public class NuclearSurfaceScanner {
     private boolean scanOneBlockInventory(ServerLevel level) {
         boolean[] canContinue = { true };
         blockInventories(level).visit(1, pos -> {
-            BlockEntity blockEntity = level.isLoaded(pos) ? level.getBlockEntity(pos) : null;
-            if (blockEntity == null) {
+            LevelChunk chunk = level.getChunkSource().getChunkNow(
+                SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
+            if (chunk == null) return ActiveHolderSet.Decision.KEEP;
+            BlockEntity blockEntity = chunk.getBlockEntity(pos);
+            if (blockEntity == null || hasPendingLoot(blockEntity)) {
+                // Native opening/mutation will re-register an unopened loot holder.
+                // A background hazard query must not generate its loot first.
                 blockInventorySlotCursors(level).remove(pos);
                 return ActiveHolderSet.Decision.REMOVE;
             }
+            if (!inventoryNeighborhoodLoaded(level, pos)) return ActiveHolderSet.Decision.KEEP;
             Optional<IItemHandler> optional = blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).resolve();
             if (optional.isEmpty() || !hasRelevantStack(optional.get())) {
                 blockInventorySlotCursors(level).remove(pos);
@@ -334,6 +343,7 @@ public class NuclearSurfaceScanner {
     }
 
     private boolean scanBlockEntityInventory(ServerLevel level, BlockEntity blockEntity) {
+        if (hasPendingLoot(blockEntity) || !inventoryNeighborhoodLoaded(level, blockEntity.getBlockPos())) return true;
         Optional<IItemHandler> optional = blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).resolve();
         if (optional.isEmpty() || !(optional.get() instanceof IItemHandlerModifiable handler)) return true;
         if (!hasRelevantStack(handler)) return true;
@@ -363,6 +373,30 @@ public class NuclearSurfaceScanner {
             if (status == NuclearSimulationService.ProcessStatus.BUDGET_EXHAUSTED) return false;
         }
         cursors.put(holderPos, advanceCursor(start, size, 1));
+        return true;
+    }
+
+    private static boolean hasPendingLoot(BlockEntity blockEntity) {
+        return blockEntity instanceof RandomizableContainerBlockEntity
+            && ((RandomizableContainerBlockEntityAccessor) blockEntity).betterChemlibHazards$getPendingLootTable() != null;
+    }
+
+    private static boolean inventoryNeighborhoodLoaded(ServerLevel level, BlockPos pos) {
+        return inventoryNeighborhoodLoaded(pos, neighbor -> level.getChunkSource().getChunkNow(
+            SectionPos.blockToSectionCoord(neighbor.getX()), SectionPos.blockToSectionCoord(neighbor.getZ())) != null);
+    }
+
+    static boolean inventoryNeighborhoodLoaded(BlockPos pos, java.util.function.Predicate<BlockPos> fullChunkLoaded) {
+        // Stack mutations may mark the native container dirty, which scans two
+        // horizontal blocks for comparators. Never promote chunks for that scan.
+        final int radius = 2;
+        for (int chunkZ = SectionPos.blockToSectionCoord(pos.getZ() - radius);
+             chunkZ <= SectionPos.blockToSectionCoord(pos.getZ() + radius); chunkZ++) {
+            for (int chunkX = SectionPos.blockToSectionCoord(pos.getX() - radius);
+                 chunkX <= SectionPos.blockToSectionCoord(pos.getX() + radius); chunkX++) {
+                if (!fullChunkLoaded.test(new BlockPos(chunkX * 16, pos.getY(), chunkZ * 16))) return false;
+            }
+        }
         return true;
     }
 

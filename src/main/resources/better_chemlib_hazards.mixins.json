@@ -6,6 +6,7 @@
   "refmap": "better_chemlib_hazards.refmap.json",
   "mixins": [
     "BlockEntityMutationMixin",
+    "RandomizableContainerBlockEntityAccessor",
     "LiquidBlockGasificationMixin",
     "RadioactiveItemEntityMixin"
   ],

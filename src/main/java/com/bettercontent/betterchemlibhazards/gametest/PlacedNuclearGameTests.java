@@ -104,6 +104,32 @@ public final class PlacedNuclearGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    public static void background_inventory_scan_preserves_pending_native_loot(GameTestHelper helper) {
+        var level = helper.getLevel();
+        BlockPos pos = helper.absolutePos(new BlockPos(1, 1, 1));
+        level.setBlockAndUpdate(pos, Blocks.CHEST.defaultBlockState());
+        var chest = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(pos);
+        var lootTable = new ResourceLocation("minecraft", "chests/simple_dungeon");
+        chest.setLootTable(lootTable, 12345L);
+        var before = chest.saveWithoutMetadata();
+        helper.assertTrue(before.contains("LootTable"), "fixture must have unopened native loot");
+        for (int pass = 0; pass < 3; pass++) {
+            com.bettercontent.betterchemlibhazards.sim.NuclearSurfaceScanner.INSTANCE.scanBlockInventoryNow(level, chest);
+            helper.assertTrue(chest.saveWithoutMetadata().equals(before),
+                "background hazard scanning must neither roll loot nor change its native NBT");
+        }
+        // Ordinary native inventory access, not the background scanner, owns the roll.
+        chest.getItem(0);
+        helper.assertTrue(!chest.saveWithoutMetadata().contains("LootTable"),
+            "native opening must still materialize its loot normally");
+        var opened = chest.saveWithoutMetadata();
+        com.bettercontent.betterchemlibhazards.sim.NuclearSurfaceScanner.INSTANCE.scanBlockInventoryNow(level, chest);
+        helper.assertTrue(chest.saveWithoutMetadata().equals(opened),
+            "ordinary non-radioactive materialized contents must remain unchanged");
+        helper.succeed();
+    }
+
     private static ItemStack placeEnrichedBlock(GameTestHelper helper, BlockPos pos) {
         var block = ForgeRegistries.BLOCKS.getValue(URANIUM);
         helper.assertTrue(block != null && block != Blocks.AIR, "ChemLib uranium block must be registered");

@@ -1,5 +1,11 @@
 # Better ChemLib Hazards
 
+## Scope and authority
+
+This repository owns its mod-specific behavior and authoring inputs. Read [local instructions](AGENTS.md)
+and the [shared documentation/policy index](../../better-content-modpack/docs/README.md).
+
+
 Better ChemLib Hazards is a Forge `1.20.1` bridge for the parts of ChemLib matter that
 need world consequences: gas escape, radioactive decay, neutron-driven fission,
 and radioactive-form emission profiles.
@@ -69,11 +75,12 @@ stale entries, and discovers untracked blocks without duplicating material recor
 The chunk case posts the real Forge lifecycle event for a loaded fixture chunk and
 roundtrips SavedData; it does not claim a disk unload/reload while fixture tickets remain.
 
-`gametest/profiles/full.txt` lists the required runtime IDs. Every invocation retains an
+`gametest/profiles/full.txt` lists the required runtime IDs. During the active task every invocation keeps an
 isolated fixture under `build/gametest/<run-token>/` with world files, logs, and
 `execution.json`. The gate requires that run's token, a finished report, and exactly the
-expected discovered and successfully executed tests. Failed fixtures remain available
-until explicitly removed; `clean` removes build artifacts. `verifyFast` also exercises
+expected discovered and successfully executed tests. Failed fixtures remain available during
+diagnosis only; at handoff all worlds/reports/builds/idle caches are removed under the
+[shared disposal policy](../../better-content-modpack/docs/policies/generated-data.md). `verifyFast` also exercises
 the execution-evidence parser against missing, incomplete, stale, malformed, duplicate,
 and failed results without starting additional servers.
 

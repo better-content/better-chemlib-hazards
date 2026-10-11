@@ -1,8 +1,9 @@
-# AGENTS.md
+# Better ChemLib Hazards
 
-## Commit discipline
+Forge 1.20.1 / Java 17; mod ID `better_chemlib_hazards`.
+Source changes: `./gradlew verifyFull --no-daemon`; stage with `./gradlew stageRuntimeJar`.
+Artifact: `build/libs/better-chemlib-hazards-<version>.jar`.
 
-- Treat existing dirty and untracked files as user-owned unless the user explicitly says otherwise.
-- Keep each commit focused on one coherent change.
-- Run `./gradlew verifyFull --no-daemon` before committing and pushing.
-- Do not push while validation is failing.
+Read [shared workspace policy](../../better-content-modpack/docs/policies/workspace.md)
+and its linked testing/disposal policies. Docs-only changes use the shared document check
+and `git diff --check`, not unrelated runtime builds.

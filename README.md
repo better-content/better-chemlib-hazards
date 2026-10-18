@@ -78,9 +78,10 @@ roundtrips SavedData; it does not claim a disk unload/reload while fixture ticke
 `gametest/profiles/full.txt` lists the required runtime IDs. During the active task every invocation keeps an
 isolated fixture under `build/gametest/<run-token>/` with world files, logs, and
 `execution.json`. The gate requires that run's token, a finished report, and exactly the
-expected discovered and successfully executed tests. Failed fixtures remain available during
-diagnosis only; at handoff all worlds/reports/builds/idle caches are removed under the
-[shared disposal policy](../../better-content-modpack/docs/policies/generated-data.md). `verifyFast` also exercises
+expected discovered and successfully executed tests. Retain failed fixtures, worlds, reports,
+builds and caches across handoffs by default under the
+[shared retention policy](../../better-content-modpack/docs/policies/generated-data.md).
+Finishing activity deletes nothing. `verifyFast` also exercises
 the execution-evidence parser against missing, incomplete, stale, malformed, duplicate,
 and failed results without starting additional servers.
 

@@ -1,6 +1,8 @@
 package com.bettercontent.betterchemlibhazards.integration.adpother;
 
 import com.bettercontent.betterchemlibhazards.sim.ChemicalState;
+import com.bettercontent.betterchemlibhazards.diagnostics.PlaytestDiagnostics;
+import com.bettercontent.betterchemlibhazards.diagnostics.PlaytestLog;
 import com.endertech.minecraft.mods.adpother.AdPother;
 import com.endertech.minecraft.mods.adpother.blocks.Pollutant;
 import com.smashingmods.chemlib.api.Chemical;
@@ -39,7 +41,7 @@ public final class AdpotherGasBoundary {
      * that remainder after its source is consumed.</p>
      */
     public ReleaseResult release(ServerLevel level, BlockPos origin, ChemicalState state) {
-        if (state == null || state.mass() <= 0.0) return ReleaseResult.rejected(state);
+        if (state == null || state.mass() <= 0.0) return reject(level, state, "invalid_mass");
 
         List<PollutantPayload> payloads = new ArrayList<>();
         for (var component : state.components().entrySet()) {
@@ -47,13 +49,13 @@ public final class AdpotherGasBoundary {
             // A source may only be debited after every component has an exact
             // native representation.  In particular 375 mB is 24 mass: it is
             // retained, rather than quietly releasing 250 mB and losing 125.
-            if (units < 0) return ReleaseResult.rejected(state);
+            if (units < 0) return reject(level, state, "fractional_native_unit");
             if (units <= 0) continue;
             Pollutant<?> pollutant = pollutantFor(component.getKey()).orElse(null);
-            if (pollutant == null) return ReleaseResult.rejected(state);
+            if (pollutant == null) return reject(level, state, "no_pollutant_mapping");
             payloads.add(new PollutantPayload(component.getKey(), pollutant, units));
         }
-        if (payloads.isEmpty()) return ReleaseResult.rejected(state);
+        if (payloads.isEmpty()) return reject(level, state, "no_payload");
 
         Map<BlockPos, BlockState> virtualStates = new HashMap<>();
         List<Placement> placements = new ArrayList<>();
@@ -77,7 +79,7 @@ public final class AdpotherGasBoundary {
                     placements.add(new Placement(pos, payload.pollutant(), accepted));
                 }
             }
-            if (remaining > 0) return ReleaseResult.rejected(state);
+            if (remaining > 0) return reject(level, state, "insufficient_loaded_capacity");
         }
 
         BlockPos firstTarget = null;
@@ -90,11 +92,26 @@ public final class AdpotherGasBoundary {
         // report rejection or restore source blocks: a post-insert rejection is
         // ambiguous to callers and can duplicate matter on their rollback path.
         virtualStates.forEach((pos, next) -> level.setBlock(pos, next, 3));
+        if (PlaytestDiagnostics.LOG.enabled("gas")) {
+            final int units = acceptedUnits;
+            PlaytestDiagnostics.LOG.debug("gas", "gas.release", PlaytestLog.Context.server(level.dimension().location().toString(), level.getGameTime()),
+                "requested", "native_writes_invoked", () -> com.bettercontent.betterchemlibhazards.diagnostics.FeatureObservation.fields(units, virtualStates.size()));
+        }
         return new ReleaseResult(
             acceptedUnits * MASS_PER_ADPOTHER_UNIT,
             0.0,
             firstTarget
         );
+    }
+
+    private static ReleaseResult reject(ServerLevel level, ChemicalState state, String reason) {
+        var log = PlaytestDiagnostics.LOG;
+        if (log.enabled("gas")) {
+            log.debug("gas", "gas.release", PlaytestLog.Context.server(level.dimension().location().toString(), level.getGameTime()),
+                "insufficient_loaded_capacity".equals(reason) ? "deferred" : "rejected", reason,
+                () -> PlaytestLog.fields("retained_mass", state == null ? 0.0 : state.mass(), "source_debit", 0));
+        }
+        return ReleaseResult.rejected(state);
     }
 
     public String chemicalId(Pollutant<?> pollutant) {

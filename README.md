@@ -1,5 +1,25 @@
 # Better ChemLib Hazards
 
+## Playtest diagnostics
+
+`bc.playtest.better_chemlib_hazards.gas` distinguishes invalid/fractional/unmapped/empty
+preflight rejection from insufficient-loaded-capacity deferral. Native write invocation
+reports the boundary's accepted-mass result and explicitly leaves source debit to the
+caller; it does not claim independent block observation or disk durability. The old
+unbounded fixed-emission DEBUG is replaced by fixed scalar30-second `nuclear` aggregates.
+Focused nuclear TRACE uses only existing emission values and the causal native position.
+
+TRACE needs the logger at TRACE plus JVM properties
+`bc.playtest.trace.better_chemlib_hazards.dimension=namespace:path` and
+`bc.playtest.trace.better_chemlib_hazards.pos=x,y,z`. Absent/invalid focus has no detail and
+one status; first matching detail arms60 seconds/1000 records once per process, subject
+to the ordinary120/minute burst20 bucket. All categories share256 aggregation keys and
+2048-character records; native ticks summarize30-second windows and server stop clears
+aggregation. INFO startup uses exact own-artifact source metadata/version when present,
+UNKNOWN otherwise, plus integration presence. Standalone stays native INFO; pack profile
+selects scoped DEBUG/`bc.playtest.level`. No inventory/NBT/seed/payload data is logged.
+The six-case common contract and exact16:1 projection tests run with the source gate.
+
 ## Scope and authority
 
 This repository owns its mod-specific behavior and authoring inputs. Read [local instructions](AGENTS.md)
@@ -68,7 +88,7 @@ Common tasks:
 The JVM unit coverage gate is intentionally focused on pure isotope, decay,
 fission, gas-boundary, and scheduling logic. Forge event handlers are thin
 integration boundaries. `verifyFast` runs the JVM coverage gate; `verifyFull`
-also builds the runtime JAR and runs three headless Forge GameTests. They exercise native
+also builds the runtime JAR and runs the reviewed headless Forge GameTest profile. It exercises native
 ChemLib block placement through Forge's event path, isotope-preserving native loot and
 sidecar consumption, and chunk reconciliation that retains enriched blocks, removes
 stale entries, and discovers untracked blocks without duplicating material records.
@@ -77,7 +97,10 @@ roundtrips SavedData; it does not claim a disk unload/reload while fixture ticke
 
 `gametest/profiles/full.txt` lists the required runtime IDs. During the active task every invocation keeps an
 isolated fixture under `build/gametest/<run-token>/` with world files, logs, and
-`execution.json`. The gate requires that run's token, a finished report, and exactly the
+`execution.json`. Preparation creates an absent `server.properties` containing comments
+only, so native defaults are unchanged and initial settings loading does not fail with
+`NoSuchFileException`. Existing properties are never overwritten; the Minecraft-free
+evidence guard tests both absence and preservation. The gate requires that run's token, a finished report, and exactly the
 expected discovered and successfully executed tests. Retain failed fixtures, worlds, reports,
 builds and caches across handoffs by default under the
 [shared retention policy](../../better-content-modpack/docs/policies/generated-data.md).

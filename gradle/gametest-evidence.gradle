@@ -30,8 +30,18 @@ def validateExecution = { File reportFile, List<String> expected, String token -
         if (failures) throw new GradleException("GameTests failed: ${failures}")
 }
 
+// A fresh GameTest directory must have a readable settings input. Absence makes
+// native Settings.loadFromFile report ERROR before default recovery; no overrides are needed.
+def prepareServerProperties = { File properties ->
+    if (!properties.exists()) {
+        properties.parentFile.mkdirs()
+        properties.text = '# Fresh source GameTest fixture: native defaults, no overrides.\n'
+    }
+}
+
 tasks.matching { it.name == 'runGameTestServer' }.configureEach {
     doFirst {
+        prepareServerProperties(runDirectory.get().file('server.properties').asFile)
         java.nio.file.Files.deleteIfExists(executionReport.get().asFile.toPath())
         copy {
             from(file('src/main/resources/gameteststructures').isDirectory() ? file('src/main/resources/gameteststructures') : file('gameteststructures'))
@@ -73,7 +83,15 @@ tasks.register('verifyGameTestEvidenceGuard') {
         boolean rejectedMissing = false
         try { validateExecution(fixture, ['required'], 'current') } catch (Exception expected) { rejectedMissing = true }
         if (!rejectedMissing) throw new GradleException('Execution guard accepted missing evidence')
-        logger.lifecycle('GameTest execution guard rejected 11 invalid/missing evidence cases')
+        def properties = layout.buildDirectory.file('gametest-guard-fixtures/' + runToken + '/server.properties').get().asFile
+        prepareServerProperties(properties)
+        if (!properties.isFile() || !properties.readLines().every { !it || it.startsWith('#') })
+            throw new GradleException('Fresh GameTest properties must exist without overriding native defaults')
+        properties.text = 'max-tick-time=123456\n'
+        prepareServerProperties(properties)
+        if (properties.text != 'max-tick-time=123456\n')
+            throw new GradleException('GameTest preparation overwrote existing properties')
+        logger.lifecycle('GameTest execution guard rejected 11 invalid/missing evidence cases; properties absence/preservation checked')
     }
 }
 tasks.matching { it.name == 'verifyFast' }.configureEach { dependsOn('verifyGameTestEvidenceGuard') }

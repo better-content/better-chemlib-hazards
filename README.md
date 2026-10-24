@@ -20,11 +20,7 @@ UNKNOWN otherwise, plus integration presence. Standalone stays native INFO; pack
 selects scoped DEBUG/`bc.playtest.level`. No inventory/NBT/seed/payload data is logged.
 The six-case common contract and exact16:1 projection tests run with the source gate.
 
-## Scope and authority
-
-This repository owns its mod-specific behavior and authoring inputs. Read [local instructions](AGENTS.md)
-and the [shared documentation/policy index](../../better-content-modpack/docs/README.md).
-
+## Scope
 
 Better ChemLib Hazards is a Forge `1.20.1` bridge for the parts of ChemLib matter that
 need world consequences: gas escape, radioactive decay, neutron-driven fission,
@@ -101,10 +97,8 @@ isolated fixture under `build/gametest/<run-token>/` with world files, logs, and
 only, so native defaults are unchanged and initial settings loading does not fail with
 `NoSuchFileException`. Existing properties are never overwritten; the Minecraft-free
 evidence guard tests both absence and preservation. The gate requires that run's token, a finished report, and exactly the
-expected discovered and successfully executed tests. Retain failed fixtures, worlds, reports,
-builds and caches across handoffs by default under the
-[shared retention policy](../../better-content-modpack/docs/policies/generated-data.md).
-Finishing activity deletes nothing. `verifyFast` also exercises
+expected discovered and successfully executed tests.
+`verifyFast` also exercises
 the execution-evidence parser against missing, incomplete, stale, malformed, duplicate,
 and failed results without starting additional servers.
 

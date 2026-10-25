@@ -39,9 +39,29 @@ def prepareServerProperties = { File properties ->
     }
 }
 
+// Exact defaults emitted by pinned AdPother 8.1.49.0-build.2294. An absent
+// common TOML is corrected after Forge installs its watcher, firing a reload
+// that races AdPother's main-thread creation of the per-source CFG files.
+// Supply the complete, unchanged defaults before Forge starts; watching and
+// ordinary reload behavior remain enabled. A schema change must be reviewed.
+def adPotherDefaults = file('gametest/config/adpother-common.toml')
+def defaultsSha256 = 'd255babc81f6729ce3442522c76cab2a05f960b496f292fdc0371af69745f514'
+def sha256 = { File input -> java.security.MessageDigest.getInstance('SHA-256').digest(input.bytes).encodeHex().toString() }
+def prepareAdPotherDefaults = { File target, File source = adPotherDefaults ->
+    if (!source.isFile() || sha256(source) != defaultsSha256)
+        throw new GradleException('Pinned native AdPother defaults changed or are missing')
+    if (target.exists()) {
+        if (!target.isFile()) throw new GradleException('Native AdPother config is not a regular file')
+        return // Never overwrite authored settings or reuse/repair old evidence.
+    }
+    target.parentFile.mkdirs()
+    java.nio.file.Files.copy(source.toPath(), target.toPath())
+}
+
 tasks.matching { it.name == 'runGameTestServer' }.configureEach {
     doFirst {
         prepareServerProperties(runDirectory.get().file('server.properties').asFile)
+        prepareAdPotherDefaults(runDirectory.get().file('config/adpother-common.toml').asFile)
         java.nio.file.Files.deleteIfExists(executionReport.get().asFile.toPath())
         copy {
             from(file('src/main/resources/gameteststructures').isDirectory() ? file('src/main/resources/gameteststructures') : file('gameteststructures'))
@@ -51,6 +71,9 @@ tasks.matching { it.name == 'runGameTestServer' }.configureEach {
     doLast {
         def expected = expectedProfile.readLines().collect { it.trim() }.findAll { it && !it.startsWith('#') }
         validateExecution(executionReport.get().asFile, expected, runToken)
+        def defaults = runDirectory.get().file('config/adpother-common.toml').asFile
+        if (!defaults.isFile() || sha256(defaults) != defaultsSha256)
+            throw new GradleException('Native AdPother corrected or changed the reviewed complete defaults')
         logger.lifecycle("Verified ${expected.size()} executed GameTests in profile full: ${executionReport.get().asFile}")
     }
 }
@@ -91,7 +114,25 @@ tasks.register('verifyGameTestEvidenceGuard') {
         prepareServerProperties(properties)
         if (properties.text != 'max-tick-time=123456\n')
             throw new GradleException('GameTest preparation overwrote existing properties')
-        logger.lifecycle('GameTest execution guard rejected 11 invalid/missing evidence cases; properties absence/preservation checked')
+        def seedRoot = layout.buildDirectory.dir('gametest-guard-fixtures/' + runToken + '/adpother').get().asFile
+        def target = new File(seedRoot, 'config/adpother-common.toml')
+        prepareAdPotherDefaults(target)
+        if (sha256(target) != defaultsSha256) throw new GradleException('Incomplete native config seed')
+        target.text = 'globalEmissionRate = 0.5\n'
+        prepareAdPotherDefaults(target)
+        if (target.text != 'globalEmissionRate = 0.5\n') throw new GradleException('Authored native config overwritten')
+        def invalidSource = new File(seedRoot, 'incomplete.toml')
+        invalidSource.text = 'globalEmissionRate = 1.0\n'
+        def absentTarget = new File(seedRoot, 'must-remain-absent.toml')
+        boolean badSeedRejected = false
+        try { prepareAdPotherDefaults(absentTarget, invalidSource) } catch (GradleException expected) { badSeedRejected = true }
+        if (!badSeedRejected || absentTarget.exists()) throw new GradleException('Unreviewed partial defaults admitted')
+        def directoryTarget = new File(seedRoot, 'directory.toml')
+        directoryTarget.mkdirs()
+        boolean directoryRejected = false
+        try { prepareAdPotherDefaults(directoryTarget) } catch (GradleException expected) { directoryRejected = true }
+        if (!directoryRejected || !directoryTarget.isDirectory()) throw new GradleException('Non-file config not preserved/rejected')
+        logger.lifecycle('GameTest execution guard rejected 11 invalid/missing evidence cases; properties and pinned default seed absence/preservation/integrity checked')
     }
 }
 tasks.matching { it.name == 'verifyFast' }.configureEach { dependsOn('verifyGameTestEvidenceGuard') }

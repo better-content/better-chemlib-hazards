@@ -137,11 +137,20 @@ public final class AdpotherGasBoundary {
         int separator = chemicalId.indexOf(':');
         String path = separator >= 0 ? chemicalId.substring(separator + 1) : chemicalId;
         if (path.endsWith("_lamp_block")) path = path.substring(0, path.length() - "_lamp_block".length());
+        // Propylene is a distinct Manufacturing identity, not an alias for every
+        // namespace's "propylene". Refuse foreign IDs before the name-only native lookup.
+        if ("propylene".equals(path) && !isCanonicalPropyleneId(chemicalId)) {
+            return Optional.empty();
+        }
         Optional<Pollutant<?>> exact = AdPother.getInstance().pollutants.findByName(path);
         if (exact.isPresent()) return exact;
         if ("carbon_dioxide".equals(path)) return AdPother.getInstance().pollutants.findByName("carbon");
         if ("sulfur_dioxide".equals(path)) return AdPother.getInstance().pollutants.findByName("sulfur");
         return Optional.empty();
+    }
+
+    static boolean isCanonicalPropyleneId(String chemicalId) {
+        return "better_manufacturing:propylene".equals(chemicalId);
     }
 
     static List<BlockPos> candidateOffsets(String chemicalId) {

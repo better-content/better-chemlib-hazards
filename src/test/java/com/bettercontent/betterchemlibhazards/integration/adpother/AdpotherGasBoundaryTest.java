@@ -12,6 +12,18 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class AdpotherGasBoundaryTest {
     @Test
+    void nativePropyleneMappingRequiresManufacturingIdentity() {
+        assertTrue(AdpotherGasBoundary.isCanonicalPropyleneId("better_manufacturing:propylene"));
+        assertFalse(AdpotherGasBoundary.isCanonicalPropyleneId("chemlib:propylene"));
+        assertFalse(AdpotherGasBoundary.isCanonicalPropyleneId("adpother:propylene"));
+        assertFalse(AdpotherGasBoundary.isCanonicalPropyleneId(null));
+        // Entry-point regression: reject namespace collisions before consulting
+        // the name-only AdPother registry (which is unavailable in a unit JVM).
+        assertTrue(AdpotherGasBoundary.INSTANCE.pollutantFor("chemlib:propylene").isEmpty());
+        assertTrue(AdpotherGasBoundary.INSTANCE.pollutantFor("adpother:propylene_lamp_block").isEmpty());
+    }
+
+    @Test
     void candidateOrderIsDeterministicAndSpeciesSpecific() {
         var hydrogen = AdpotherGasBoundary.candidateOffsets("chemlib:hydrogen");
         var methane = AdpotherGasBoundary.candidateOffsets("chemlib:methane");

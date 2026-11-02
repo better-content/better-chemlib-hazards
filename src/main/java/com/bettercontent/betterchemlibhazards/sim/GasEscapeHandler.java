@@ -343,6 +343,15 @@ public class GasEscapeHandler {
                 ? new ItemStack(Items.BUCKET, stack.getCount()) : ItemStack.EMPTY;
             return Optional.of(new EscapePayload(state, replacement));
         }
+        // Manufacturing's existing propylene packet is a gas, never a stable loose solid.
+        // The same native release boundary handles its tank fluid and this item form.
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        if (itemId != null && itemId.toString().equals("better_manufacturing:propylene")) {
+            return Optional.of(new EscapePayload(
+                escapedState(itemId.toString(), stack.getCount(), LatentDataManager.INSTANCE.traits(itemId.toString())),
+                ItemStack.EMPTY
+            ));
+        }
         if (stack.getItem() instanceof Chemical chemical && canEscapeAsGas(chemical)) {
             ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
             if (id == null) return Optional.empty();

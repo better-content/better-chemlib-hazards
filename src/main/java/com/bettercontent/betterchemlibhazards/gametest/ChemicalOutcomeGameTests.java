@@ -4,6 +4,8 @@ import com.bettercontent.betterindustrialheat.api.ThermalCapabilities;
 import com.bettercontent.betterchemlibhazards.api.event.ChemicalOutcomeEvent;
 import com.bettercontent.betterchemlibhazards.integration.adpother.AdpotherGasBoundary;
 import com.bettercontent.betterchemlibhazards.sim.DisturbedRadioactiveData;
+import com.bettercontent.betterchemlibhazards.sim.GasEscapeHandler;
+import com.bettercontent.betterchemlibhazards.sim.GasFluidCodec;
 import com.bettercontent.betterchemlibhazards.sim.LatentRadiationService;
 import com.bettercontent.betterchemlibhazards.sim.RadioactiveFormResolver;
 import com.mojang.authlib.GameProfile;
@@ -20,6 +22,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.common.util.FakePlayerFactory;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -34,6 +38,38 @@ import java.util.UUID;
 @GameTestHolder("better_chemlib_hazards")
 @PrefixGameTestTemplate(false)
 public final class ChemicalOutcomeGameTests {
+    @GameTest(template = "chemical_empty")
+    public static void manufactured_propylene_keeps_one_native_gas_identity(GameTestHelper helper) {
+        // Optional integration test: this mod still runs in a ChemLib-only installation.
+        if (!ModList.get().isLoaded("better_manufacturing")) { helper.succeed(); return; }
+        var itemId = new ResourceLocation("better_manufacturing", "propylene");
+        var hotId = new ResourceLocation("better_manufacturing", "hot_propylene");
+        var cooledId = new ResourceLocation("better_manufacturing", "propylene_stream");
+        var item = ForgeRegistries.ITEMS.getValue(itemId);
+        var hot = ForgeRegistries.FLUIDS.getValue(hotId);
+        var cooled = ForgeRegistries.FLUIDS.getValue(cooledId);
+        helper.assertTrue(item != null && hot != null && cooled != null,
+            "Polymer gas item and both transport fluid registrations must resolve");
+        var state = GasFluidCodec.stateFromFluid(new FluidStack(hot, 250)).orElseThrow();
+        helper.assertTrue(state.chemicalId().equals(itemId.toString()) && state.mass() == 16.0,
+            "250 mB of either propylene stream is exactly one native hazard unit (not a molar mass)");
+        var returned = GasFluidCodec.fluidFromState(state, 250);
+        helper.assertTrue(returned.getFluid() == cooled && returned.getAmount() == 250
+            && GasFluidCodec.stateFromFluid(returned).orElseThrow().chemicalId().equals(itemId.toString()),
+            "Hot-to-cooled transport must round trip without aliasing to propane or ethylene");
+        var pollutant = AdpotherGasBoundary.INSTANCE.pollutantFor(itemId.toString()).orElseThrow();
+        helper.assertTrue(AdpotherGasBoundary.INSTANCE.chemicalId(pollutant).equals(itemId.toString()),
+            "Native pollutant must decode back to distinct Manufacturing propylene");
+        BlockPos origin = helper.absolutePos(new BlockPos(4, 4, 4));
+        for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-3, -3, -3), origin.offset(3, 3, 3)))
+            helper.getLevel().setBlockAndUpdate(pos, Blocks.BEDROCK.defaultBlockState());
+        helper.getLevel().setBlockAndUpdate(origin, Blocks.AIR.defaultBlockState());
+        var remainder = GasEscapeHandler.INSTANCE.escapeStackNow(new ItemStack(item), helper.getLevel(), origin);
+        helper.assertTrue(remainder.isEmpty() && helper.getLevel().getBlockState(origin).is(pollutant),
+            "Unsealed propylene item must commit to its own native AdPother pollutant");
+        helper.succeed();
+    }
+
     @GameTest(template = "chemical_empty")
     public static void gas_outcome_requires_actual_release(GameTestHelper helper) {
         var level = helper.getLevel();

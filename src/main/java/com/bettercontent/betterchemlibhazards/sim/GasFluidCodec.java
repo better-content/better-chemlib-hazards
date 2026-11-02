@@ -32,7 +32,14 @@ public final class GasFluidCodec {
 
     public static Optional<String> chemicalId(Fluid fluid) {
         ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(fluid);
-        if (fluidId == null || !"chemlib".equals(fluidId.getNamespace())) return Optional.empty();
+        if (fluidId == null) return Optional.empty();
+        // Tank-only Manufacturing propylene has one chemical identity across hot and cooled streams.
+        if ("better_manufacturing".equals(fluidId.getNamespace()) && (
+            fluidId.getPath().equals("hot_propylene") || fluidId.getPath().equals("flowing_hot_propylene")
+            || fluidId.getPath().equals("propylene_stream") || fluidId.getPath().equals("flowing_propylene_stream"))) {
+            return Optional.of("better_manufacturing:propylene");
+        }
+        if (!"chemlib".equals(fluidId.getNamespace())) return Optional.empty();
         String path = fluidId.getPath();
         String chemicalPath;
         if (path.endsWith("_fluid")) {
@@ -51,7 +58,12 @@ public final class GasFluidCodec {
 
     public static Optional<Fluid> sourceFluid(String chemicalId) {
         ResourceLocation id = ResourceLocation.tryParse(chemicalId);
-        if (id == null || !"chemlib".equals(id.getNamespace())) return Optional.empty();
+        if (id == null) return Optional.empty();
+        if (id.toString().equals("better_manufacturing:propylene")) {
+            Fluid propylene = ForgeRegistries.FLUIDS.getValue(new ResourceLocation("better_manufacturing", "propylene_stream"));
+            return propylene == null || propylene == Fluids.EMPTY ? Optional.empty() : Optional.of(propylene);
+        }
+        if (!"chemlib".equals(id.getNamespace())) return Optional.empty();
         Item item = ForgeRegistries.ITEMS.getValue(id);
         if (!(item instanceof Chemical chemical) || !GasEscapeHandler.canEscapeAsGas(chemical)) return Optional.empty();
         Fluid fluid = ForgeRegistries.FLUIDS.getValue(ResourceLocation.fromNamespaceAndPath(id.getNamespace(), id.getPath() + "_fluid"));

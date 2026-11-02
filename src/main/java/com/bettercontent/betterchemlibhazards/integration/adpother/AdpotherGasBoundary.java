@@ -120,6 +120,9 @@ public final class AdpotherGasBoundary {
         if ("carbon".equals(path)) return "chemlib:carbon_dioxide";
         if ("sulfur".equals(path)) return "chemlib:sulfur_dioxide";
         if ("dust".equals(path)) return "better_chemlib_hazards:dust";
+        // One distinct Manufacturing propylene identity in both native pollution
+        // and the tank/packet codec; never mislabel it as propane or ethylene.
+        if ("propylene".equals(path)) return "better_manufacturing:propylene";
 
         ResourceLocation chemicalId = ResourceLocation.fromNamespaceAndPath("chemlib", path);
         if (ForgeRegistries.ITEMS.getValue(chemicalId) instanceof Chemical chemical
